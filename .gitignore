@@ -1,0 +1,5 @@
+backend/.env
+node_modules/
+.env
+backend/server.backup.js
+frontend/index-backup.html
