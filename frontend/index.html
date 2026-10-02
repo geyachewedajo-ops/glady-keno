@@ -1750,11 +1750,31 @@ $("numberMsg").textContent=
 
 $("navHistory").onclick=async()=>{
 $("money").classList.add("hidden");
-$("gamesPanel").classList.remove("hidden");
+
 const h=$("hist");
-if(h){
+
+if(!h)return;
+
 h.classList.remove("hidden");
-h.scrollIntoView({behavior:"smooth",block:"start"});
+h.textContent="Loading history...";
+
+try{
+
+ const d=await get("/api/tickets/history");
+
+ submittedTickets=(d.tickets||[]).slice(0,50);
+
+ renderHistory(submittedTickets);
+
+ h.scrollIntoView({
+  behavior:"smooth",
+  block:"start"
+ });
+
+}catch(e){
+
+ h.textContent=e.message;
+
 }
 };
 </script>
