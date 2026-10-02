@@ -1002,6 +1002,40 @@ app.post("/api/game/reset",admin,async(q,r)=>{
   }
 });
 
+async function createAdmin(){
+  const username=process.env.ADMIN_USERNAME||"admin";
+  const password=process.env.ADMIN_PASSWORD;
+
+  if(!password){
+    console.log("⚠️ ADMIN_PASSWORD is not set.");
+    return;
+  }
+
+  const exists=await User.findOne({username});
+
+  if(exists){
+    if(exists.role!=="admin"){
+      exists.role="admin";
+      await exists.save();
+      console.log("✅ Existing user promoted to admin:",username);
+    }else{
+      console.log("✅ Admin already exists:",username);
+    }
+    return;
+  }
+
+  const passwordHash=await bcrypt.hash(password,12);
+
+  await User.create({
+    username,
+    passwordHash,
+    role:"admin",
+    balance:0
+  });
+
+  console.log("✅ Admin account created:",username);
+}
+
 async function main(){
   if(!process.env.MONGODB_URI){
     throw new Error("MONGODB_URI is missing.");
@@ -1022,6 +1056,8 @@ async function main(){
   console.log("PERSISTENT DRAW SEQUENCE");
   console.log("PERSISTENT TRANSACTIONS");
   console.log("================================");
+
+  await createAdmin();
 
   await startup();
 
