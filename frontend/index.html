@@ -624,7 +624,6 @@ body{
 
 <div class="tabs">
 <button id="ct" class="tab active">CUSTOMER</button>
-<button id="at" class="tab">ADMIN</button>
 </div>
 
 <div id="loginForm">
@@ -842,7 +841,6 @@ LOGOUT
 const API="https://glady-keno-backend.onrender.com";
 
 let token="";
-let mode="customer";
 let games=[];
 let selected=1;
 let currentNumbers=[];
@@ -851,18 +849,6 @@ let submittedTickets=[];
 let timer;
 
 const $=x=>document.getElementById(x);
-
-$("ct").onclick=()=>{
- mode="customer";
- $("ct").classList.add("active");
- $("at").classList.remove("active");
-};
-
-$("at").onclick=()=>{
- mode="admin";
- $("at").classList.add("active");
- $("ct").classList.remove("active");
-};
 
 $("showReg").onclick=()=>{
  $("loginForm").classList.add("hidden");
@@ -938,12 +924,6 @@ $("loginBtn").onclick=async()=>{
    username:$("user").value.trim(),
    password:$("pass").value
   });
-
-  if(mode==="customer"&&d.role!=="customer")
-   throw Error("Use Customer login.");
-
-  if(mode==="admin"&&d.role!=="admin")
-   throw Error("Use Admin login.");
 
   token=d.token;
 
