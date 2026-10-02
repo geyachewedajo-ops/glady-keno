@@ -660,7 +660,6 @@ body{
 <div class="card">
 <div class="menu">
 <button id="moneyBtn" class="primary">💰 MONEY</button>
-<button id="gamesBtn" class="white">🎮 GAMES</button>
 <button id="navAddTicket" class="primary">🎫 ADD TICKET</button>
 <button id="navHistory" class="white">📜 MY HISTORY</button>
 </div>
@@ -706,13 +705,6 @@ SUBMIT WITHDRAW
 
 </div>
 
-<div id="gamesPanel">
-
-<div class="card">
-<h3>🎮 Games</h3>
-<div id="games"></div>
-<p id="gameMsg" class="msg"></p>
-</div>
 
 <div class="card">
 
@@ -984,10 +976,6 @@ $("moneyBtn").onclick=()=>{
  $("gamesPanel").classList.toggle("hidden");
 };
 
-$("gamesBtn").onclick=()=>{
- $("money").classList.add("hidden");
- $("gamesPanel").classList.remove("hidden");
-};
 
 function renderNumbers(){
 
@@ -1291,7 +1279,6 @@ async function loadGames(){
     games[games.length-1].game;
   }
 
-  renderGames();
   updateSelected();
   loadSubmittedTickets();
 
@@ -1304,51 +1291,6 @@ async function loadGames(){
  clearInterval(timer);
 
  timer=setInterval(loadGames,1000);
-}
-
-function renderGames(){
-
- $("games").innerHTML=
-  games.map(g=>`
-
-  <div class="game ${
-   g.game===selected?"selected":""
-  }">
-
-   <b>
-    ROUND ${g.round} • GAME ${g.game}
-   </b>
-
-   <br>
-
-   ${g.phase}
-
-   ${
-    g.phase==="BETTING"
-    ?"⏱ "+g.countdown+"s"
-    :""
-   }
-
-   <br>
-
-   Tickets: ${g.ticketCount}
-
-   <br>
-
-   <button
-    onclick="chooseGame(${g.game})"
-    class="white"
-   >
-    ${
-     g.game===selected
-     ?"SELECTED"
-     :"VIEW GAME"
-    }
-   </button>
-
-  </div>
-
- `).join("");
 }
 
 window.chooseGame=n=>{
