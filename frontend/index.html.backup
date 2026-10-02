@@ -661,58 +661,6 @@ body{
 <button id="moneyBtn" class="primary">💰 MONEY</button>
 <button id="navAddTicket" class="primary">🎫 ADD TICKET</button>
 <button id="navHistory" class="white">📜 MY HISTORY</button>
-<button id="navRules" class="white">🎯 GAME RULE</button>
-<a href="https://t.me/Flew123" target="_blank" rel="noopener"
-style="display:inline-block;text-align:center;background:#229ED9;color:white;
-padding:12px;border-radius:8px;text-decoration:none;font-weight:bold;">
-💬 TELEGRAM
-</a>
-</div>
-</div>
-
-<div id="rules" class="hidden">
-
-<div class="card">
-<h2>🎯 GLADY KENO GAME RULE</h2>
-
-<p><b>How to Play</b></p>
-<p>Choose 1 to 10 numbers from the 1–80 board.</p>
-<p>Enter your stake and add your ticket before betting time ends.</p>
-<p>The game draws 20 numbers.</p>
-
-<h3>💰 PRIZE RULE</h3>
-
-<div style="overflow-x:auto;">
-<table style="width:100%;border-collapse:collapse;text-align:center;">
-<tr>
-<th style="padding:8px;border-bottom:1px solid #394858;">Numbers</th>
-<th style="padding:8px;border-bottom:1px solid #394858;">Matches</th>
-<th style="padding:8px;border-bottom:1px solid #394858;">Prize × Stake</th>
-</tr>
-<tr><td>1</td><td>1</td><td>2×</td></tr>
-<tr><td>2</td><td>1 / 2</td><td>1× / 8×</td></tr>
-<tr><td>3</td><td>2 / 3</td><td>2× / 15×</td></tr>
-<tr><td>4</td><td>2 / 3 / 4</td><td>1× / 5× / 30×</td></tr>
-<tr><td>5</td><td>2 / 3 / 4 / 5</td><td>1× / 3× / 15× / 50×</td></tr>
-<tr><td>6</td><td>3 / 4 / 5 / 6</td><td>2× / 8× / 30× / 100×</td></tr>
-<tr><td>7</td><td>3 / 4 / 5 / 6 / 7</td><td>1× / 5× / 20× / 75× / 250×</td></tr>
-<tr><td>8</td><td>4 / 5 / 6 / 7 / 8</td><td>2× / 10× / 40× / 150× / 500×</td></tr>
-<tr><td>9</td><td>4 / 5 / 6 / 7 / 8 / 9</td><td>2× / 10× / 50× / 200× / 750× / 2500×</td></tr>
-<tr><td>10</td><td>5 / 6 / 7 / 8 / 9 / 10</td><td>5× / 20× / 100× / 500× / 2500× / 10000×</td></tr>
-</table>
-</div>
-
-<p style="margin-top:14px;">
-<b>Example:</b> If your stake is 10 ETB and the prize is 50×,
-your prize is 500 ETB.
-</p>
-
-<p style="color:#fbbf24;">
-⚠️ Prize = Stake × Prize Multiplier
-</p>
-
-<button id="closeRules" class="white">CLOSE RULES</button>
-
 </div>
 </div>
 
@@ -1778,20 +1726,6 @@ block:"center"
 $("numberMsg").textContent=
 "Choose 1 to 10 numbers for your ticket.";
 }
-};
-
-$("navRules").onclick=()=>{
- $("money").classList.add("hidden");
- $("hist").classList.add("hidden");
- $("rules").classList.remove("hidden");
- $("rules").scrollIntoView({
-  behavior:"smooth",
-  block:"start"
- });
-};
-
-$("closeRules").onclick=()=>{
- $("rules").classList.add("hidden");
 };
 
 $("navHistory").onclick=async()=>{
