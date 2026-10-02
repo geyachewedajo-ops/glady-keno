@@ -661,6 +661,8 @@ body{
 <div class="menu">
 <button id="moneyBtn" class="primary">💰 MONEY</button>
 <button id="gamesBtn" class="white">🎮 GAMES</button>
+<button id="navAddTicket" class="primary">🎫 ADD TICKET</button>
+<button id="navHistory" class="white">📜 MY HISTORY</button>
 </div>
 </div>
 
@@ -1786,6 +1788,24 @@ $("logout").onclick=logout;
 $("adminLogout").onclick=logout;
 
 renderTickets();
+
+
+$("navAddTicket").onclick=()=>{
+$("money").classList.add("hidden");
+$("gamesPanel").classList.remove("hidden");
+const t=$("tickets");
+if(t)t.scrollIntoView({behavior:"smooth",block:"start"});
+};
+
+$("navHistory").onclick=async()=>{
+$("money").classList.add("hidden");
+$("gamesPanel").classList.remove("hidden");
+const h=$("hist");
+if(h){
+h.classList.remove("hidden");
+h.scrollIntoView({behavior:"smooth",block:"start"});
+}
+};
 </script>
 
 </body>
