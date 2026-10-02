@@ -1793,8 +1793,17 @@ renderTickets();
 $("navAddTicket").onclick=()=>{
 $("money").classList.add("hidden");
 $("gamesPanel").classList.remove("hidden");
-const t=$("tickets");
-if(t)t.scrollIntoView({behavior:"smooth",block:"start"});
+
+const board=$("numbers");
+if(board){
+board.scrollIntoView({
+behavior:"smooth",
+block:"center"
+});
+
+$("numberMsg").textContent=
+"Choose 1 to 10 numbers for your ticket.";
+}
 };
 
 $("navHistory").onclick=async()=>{
