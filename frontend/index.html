@@ -1400,9 +1400,7 @@ function updateSelected(){
 
  }else{
 
-  $("result").innerHTML=
-   "<span class='ok'>DRAW COMPLETED</span><br>"+
-   drawn.slice(0,20).join(", ");
+  $("result").innerHTML="";
 
   /* FORCE IMMEDIATE TICKET REFRESH */
   loadSubmittedTickets();
