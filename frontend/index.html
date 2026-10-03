@@ -670,6 +670,7 @@ body{
 <button id="moneyBtn" class="primary">💰 MONEY</button>
 <button id="navAddTicket" class="primary">🎫 ADD TICKET</button>
 <button id="navHistory" class="white">📜 MY HISTORY</button>
+<button id="navLogout" class="white">🚪 LOGOUT</button>
 <button id="navRules" class="white">🎯 GAME RULE</button>
 <a href="https://t.me/Flew123" target="_blank" rel="noopener"
 style="display:inline-block;text-align:center;background:#229ED9;color:white;
@@ -1890,6 +1891,26 @@ try{
  h.textContent=e.message;
 
 }
+};
+
+$("navLogout").onclick=async()=>{
+ try{
+  const token=localStorage.getItem("token");
+  if(token){
+   await fetch(API+"/api/logout",{
+    method:"POST",
+    headers:{
+     Authorization:"Bearer "+token
+    }
+   });
+  }
+ }catch(e){}
+
+ localStorage.removeItem("token");
+ localStorage.removeItem("username");
+ localStorage.removeItem("role");
+
+ location.reload();
 };
 </script>
 
