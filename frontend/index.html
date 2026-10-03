@@ -1387,27 +1387,8 @@ function updateSelected(){
   .map(n=>`<div class="ball">${n}</div>`)
   .join("");
 
- if(g.phase==="BETTING"){
-
-  $("result").innerHTML=
-   "<span class='pending'>⏳ BETTING OPEN</span>";
-
- }else if(g.phase==="DRAWING"){
-
-  $("result").innerHTML=
-   "<span class='pending'>🎱 DRAWING... "+
-   drawn.length+"/20</span>";
-
- }else{
-
+ if(g.phase==="BETTING"||g.phase==="DRAWING"||g.phase==="COMPLETED"){
   $("result").innerHTML="";
-
-  /* FORCE IMMEDIATE TICKET REFRESH */
-  loadSubmittedTickets();
-
-  /* FORCE BALANCE REFRESH */
-  if(typeof loadBalance==="function")
-   loadBalance();
  }
 
  renderNumbers();
