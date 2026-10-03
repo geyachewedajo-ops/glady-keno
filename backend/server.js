@@ -14,7 +14,7 @@ app.use(express.json());
 
 const BETTING_SECONDS=60;
 const DRAW_TOTAL=20;
-const DRAW_INTERVAL=1000;
+const DRAW_INTERVAL=2000;
 const COMPLETE_WAIT=4000;
 const MAX_TICKETS=10000;
 
@@ -220,19 +220,30 @@ async function getActiveGame(){
 }
 
 async function calculateCountdown(g){
-  if(g.phase==="BETTING"){
-    const elapsed=Math.floor(
-      (Date.now()-new Date(g.bettingStartedAt).getTime())/1000
-    );
 
-    return Math.max(0,BETTING_SECONDS-elapsed);
-  }
+ if(g.phase==="BETTING"){
 
-  if(g.phase==="DRAWING"){
-    return Math.max(0,DRAW_TOTAL-g.drawIndex);
-  }
+  const started=
+   new Date(g.bettingStartedAt).getTime();
 
-  return 0;
+  const elapsed=
+   Math.floor((Date.now()-started)/1000);
+
+  return Math.max(
+   0,
+   BETTING_SECONDS-elapsed
+  );
+ }
+
+ if(g.phase==="DRAWING"){
+
+  return Math.max(
+   0,
+   DRAW_TOTAL-g.drawIndex
+  );
+ }
+
+ return 0;
 }
 
 async function settleTickets(g){
@@ -312,104 +323,116 @@ async function settleTickets(g){
 let processing=false;
 
 async function gameLoop(){
-  if(processing)return;
 
-  processing=true;
+ if(processing)return;
 
-  try{
-    let g=await Game.findOne({
-      phase:{$in:["BETTING","DRAWING"]}
-    }).sort({game:-1});
+ processing=true;
 
-    if(!g){
-      g=await createGame();
-      return;
-    }
+ try{
 
-    if(g.phase==="BETTING"){
-      const remaining=await calculateCountdown(g);
+  let g=await Game.findOne({
+   phase:{$in:["BETTING","DRAWING"]}
+  }).sort({game:-1});
 
-      await Game.updateOne(
-        {_id:g._id},
-        {$set:{countdown:remaining}}
-      );
-
-      if(remaining<=0){
-        await Game.updateOne(
-          {_id:g._id,phase:"BETTING"},
-          {
-            $set:{
-              phase:"DRAWING",
-              drawingStartedAt:new Date(),
-              countdown:DRAW_TOTAL,
-              drawIndex:0,
-              drawnNumbers:[]
-            }
-          }
-        );
-
-        console.log(
-          "ROUND",g.round,
-          "GAME",g.game,
-          "DRAWING STARTED"
-        );
-      }
-
-      return;
-    }
-
-    if(g.phase==="DRAWING"){
-      const current=await Game.findById(g._id);
-
-      if(!current||current.phase!=="DRAWING")
-        return;
-
-      if(current.drawIndex<DRAW_TOTAL){
-        const number=current.drawPool[current.drawIndex];
-
-        current.drawnNumbers.push(number);
-        current.drawIndex++;
-
-        current.countdown=
-          DRAW_TOTAL-current.drawIndex;
-
-        await current.save();
-
-        console.log(
-          "ROUND",current.round,
-          "GAME",current.game,
-          "DRAW",
-          current.drawIndex+"/"+DRAW_TOTAL,
-          "NUMBER",
-          number
-        );
-
-        if(current.drawIndex>=DRAW_TOTAL){
-          await settleTickets(current);
-
-          current.phase="COMPLETED";
-          current.countdown=0;
-          current.completedAt=new Date();
-
-          await current.save();
-
-          console.log(
-            "ROUND",current.round,
-            "GAME",current.game,
-            "COMPLETED"
-          );
-        }
-      }
-    }
-
-  }catch(e){
-    console.error("GAME LOOP ERROR:",e.message);
-  }finally{
-    processing=false;
+  if(!g){
+   await createGame();
+   return;
   }
+
+  if(g.phase==="BETTING"){
+
+   const remaining=await calculateCountdown(g);
+
+   await Game.updateOne(
+    {_id:g._id,phase:"BETTING"},
+    {$set:{countdown:remaining}}
+   );
+
+   if(remaining<=0){
+
+    await Game.updateOne(
+     {_id:g._id,phase:"BETTING"},
+     {$set:{
+      phase:"DRAWING",
+      drawingStartedAt:new Date(),
+      countdown:DRAW_TOTAL,
+      drawIndex:0,
+      drawnNumbers:[]
+     }}
+    );
+
+    console.log(
+     "ROUND",g.round,
+     "GAME",g.game,
+     "DRAWING STARTED"
+    );
+   }
+
+   return;
+  }
+
+  if(g.phase==="DRAWING"){
+
+   const current=await Game.findById(g._id);
+
+   if(!current||current.phase!=="DRAWING")
+    return;
+
+   if(current.drawIndex>=DRAW_TOTAL)
+    return;
+
+   const index=current.drawIndex;
+   const number=current.drawPool[index];
+
+   current.drawnNumbers.push(number);
+   current.drawIndex=index+1;
+   current.countdown=DRAW_TOTAL-current.drawIndex;
+
+   await current.save();
+
+   console.log(
+    "DRAW",
+    current.drawIndex+"/"+DRAW_TOTAL,
+    "NUMBER",
+    number
+   );
+
+   if(current.drawIndex>=DRAW_TOTAL){
+
+    await settleTickets(current);
+
+    current.phase="COMPLETED";
+    current.countdown=0;
+    current.completedAt=new Date();
+
+    await current.save();
+
+    console.log(
+     "GAME",
+     current.game,
+     "COMPLETED"
+    );
+   }
+
+   return;
+  }
+
+ }catch(e){
+
+  console.error(
+   "GAME LOOP ERROR:",
+   e.message
+  );
+
+ }finally{
+
+  processing=false;
+
+ }
 }
 
 async function startup(){
+
   const g=await Game.findOne({
     phase:{$in:["BETTING","DRAWING"]}
   }).sort({game:-1});
@@ -428,20 +451,40 @@ async function startup(){
   );
 
   if(g.phase==="BETTING"){
+
     const remaining=await calculateCountdown(g);
 
+    await Game.updateOne(
+      {_id:g._id,phase:"BETTING"},
+      {$set:{countdown:remaining}}
+    );
+
     if(remaining<=0){
+
       await Game.updateOne(
-        {_id:g._id},
-        {
-          $set:{
-            phase:"DRAWING",
-            drawingStartedAt:new Date(),
-            countdown:DRAW_TOTAL
-          }
-        }
+        {_id:g._id,phase:"BETTING"},
+        {$set:{
+          phase:"DRAWING",
+          drawingStartedAt:new Date(),
+          countdown:DRAW_TOTAL,
+          drawIndex:0,
+          drawnNumbers:[]
+        }}
+      );
+
+      console.log(
+        "ROUND",g.round,
+        "GAME",g.game,
+        "DRAWING STARTED"
       );
     }
+  }
+
+  if(g.phase==="DRAWING"){
+    console.log(
+      "▶️ DRAW RESUMED AT",
+      g.drawIndex+"/"+DRAW_TOTAL
+    );
   }
 }
 
