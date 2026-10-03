@@ -14,7 +14,7 @@ app.use(express.json());
 
 const BETTING_SECONDS=60;
 const DRAW_TOTAL=20;
-const DRAW_INTERVAL=2000;
+const DRAW_INTERVAL=1000;
 const FINAL_PAUSE=10000;
 const COMPLETE_WAIT=4000;
 const MAX_TICKETS=10000;
@@ -1125,7 +1125,7 @@ async function main(){
 
   await startup();
 
-  setInterval(gameLoop,1000);
+  setInterval(gameLoop,DRAW_INTERVAL);
 
   app.listen(PORT,"0.0.0.0",()=>{
     console.log("🚀 Server running on port",PORT);
