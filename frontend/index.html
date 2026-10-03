@@ -1397,18 +1397,17 @@ window.chooseGame=n=>{
 function updateSelected(){
 
  const g=games.find(x=>x.game===selected);
-
  if(!g)return;
 
  $("selectedGame").textContent=g.game;
  $("gameRound").textContent=g.round;
  $("gameNo").textContent=g.game;
  $("phase").textContent=g.phase;
- $("time").textContent=g.phase==="BETTING" ? g.countdown : "";
+ $("time").textContent=
+  g.phase==="BETTING"?g.countdown:"";
 
  const drawn=Array.isArray(g.drawnNumbers)
-  ? g.drawnNumbers
-  : [];
+  ?g.drawnNumbers:[];
 
  $("draw").innerHTML=drawn
   .map(n=>`<div class="ball">${n}</div>`)
@@ -1423,8 +1422,7 @@ function updateSelected(){
 
   $("result").innerHTML=
    "<span class='pending'>🎱 DRAWING... "+
-   drawn.length+"/"+(g.drawTotal || 20)+
-   "</span>";
+   drawn.length+"/20</span>";
 
  }else{
 
@@ -1432,7 +1430,12 @@ function updateSelected(){
    "<span class='ok'>DRAW COMPLETED</span><br>"+
    drawn.join(", ");
 
+  /* FORCE IMMEDIATE TICKET REFRESH */
   loadSubmittedTickets();
+
+  /* FORCE BALANCE REFRESH */
+  if(typeof loadBalance==="function")
+   loadBalance();
  }
 
  renderNumbers();
