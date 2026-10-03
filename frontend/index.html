@@ -1024,7 +1024,7 @@ function renderNumbers(){
   g=>g.game===selected
  );
 
- const drawn=currentGame?.drawnNumbers||[];
+ const drawn=(currentGame?.drawnNumbers||[]).slice(0,20);
  const latest=drawn[drawn.length-1];
 
  for(let n=1;n<=80;n++){
