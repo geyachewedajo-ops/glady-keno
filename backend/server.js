@@ -38,15 +38,13 @@ function prize(selected,matches,stake){
 
 function makeDraw(){
   const pool=Array.from({length:80},(_,i)=>i+1);
-  const result=[];
 
-  while(result.length<DRAW_TOTAL){
-    const i=Math.floor(Math.random()*pool.length);
-    result.push(pool[i]);
-    pool.splice(i,1);
+  for(let i=pool.length-1;i>0;i--){
+    const j=crypto.randomInt(i+1);
+    [pool[i],pool[j]]=[pool[j],pool[i]];
   }
 
-  return result;
+  return pool.slice(0,DRAW_TOTAL);
 }
 
 const userSchema=new mongoose.Schema({
