@@ -1383,7 +1383,9 @@ function updateSelected(){
  const drawn=Array.isArray(g.drawnNumbers)
   ?g.drawnNumbers:[];
 
- $("draw").innerHTML=drawn
+ const finalDraw=drawn.slice(0,20);
+
+ $("draw").innerHTML=finalDraw
   .map(n=>`<div class="ball">${n}</div>`)
   .join("");
 
