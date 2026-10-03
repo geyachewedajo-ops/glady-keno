@@ -246,12 +246,14 @@ async function calculateCountdown(g){
 }
 
 async function settleTickets(g){
+
   const tickets=await Ticket.find({
     game:g.game,
     status:"PENDING"
   });
 
   for(const t of tickets){
+
     const matches=t.numbers.filter(
       n=>g.drawnNumbers.includes(n)
     ).length;
@@ -264,61 +266,83 @@ async function settleTickets(g){
 
     const result=payout>0?"WIN":"LOSE";
 
-    const updated=await Ticket.findOneAndUpdate(
-      {
-        ticketId:t.ticketId,
-        status:"PENDING"
-      },
-      {
-        $set:{
-          matches,
-          prize:payout,
-          result,
-          status:result,
-          settledAt:new Date()
-        }
-      },
-      {new:true}
-    );
+    const session=await mongoose.startSession();
 
-    if(!updated)continue;
+    try{
 
-    if(payout>0){
-      const key="PAYOUT:"+t.ticketId;
+      await session.withTransaction(async()=>{
 
-      try{
-        await Payout.create({
-          key,
+        const ticket=await Ticket.findOne({
           ticketId:t.ticketId,
-          username:t.username,
-          amount:payout
-        });
+          status:"PENDING"
+        }).session(session);
 
-        await User.updateOne(
-          {username:t.username},
-          {$inc:{balance:payout}}
-        );
+        if(!ticket)return;
 
-        console.log(
-          t.ticketId,
-          "WIN",
-          "MATCHES",matches,
-          "PRIZE",payout
-        );
+        ticket.matches=matches;
+        ticket.prize=payout;
+        ticket.result=result;
 
-      }catch(e){
-        if(e.code!==11000)throw e;
-      }
-    }else{
+        if(payout>0){
+
+          const key="PAYOUT:"+t.ticketId;
+
+          const existing=await Payout.findOne({
+            key
+          }).session(session);
+
+          if(!existing){
+
+            await Payout.create([{
+              key,
+              ticketId:t.ticketId,
+              username:t.username,
+              amount:payout
+            }],{session});
+
+            const user=await User.findOneAndUpdate(
+              {username:t.username},
+              {$inc:{balance:payout}},
+              {new:true,session}
+            );
+
+            if(!user)
+              throw new Error(
+                "User not found for payout."
+              );
+          }
+        }
+
+        ticket.status=result;
+        ticket.settledAt=new Date();
+
+        await ticket.save({session});
+      });
+
       console.log(
         t.ticketId,
-        "LOSE",
-        "MATCHES",matches
+        result,
+        "MATCHES",matches,
+        "PRIZE",payout
       );
+
+    }catch(e){
+
+      console.error(
+        "SETTLEMENT ERROR",
+        t.ticketId,
+        e.message
+      );
+
+      throw e;
+
+    }finally{
+
+      await session.endSession();
+
     }
   }
 }
-
 let processing=false;
 
 async function gameLoop(){
@@ -391,24 +415,37 @@ async function gameLoop(){
    if(!current||current.phase!=="DRAWING")
     return;
 
-   if(current.drawIndex>=DRAW_TOTAL)
-    return;
+   /*
+    * Draw exactly one number every second.
+    * Tickets remain PENDING here.
+    */
 
-   const index=current.drawIndex;
-   const number=current.drawPool[index];
+   if(current.drawIndex<DRAW_TOTAL){
 
-   current.drawnNumbers.push(number);
-   current.drawIndex=index+1;
-   current.countdown=DRAW_TOTAL-current.drawIndex;
+    const index=current.drawIndex;
+    const number=current.drawPool[index];
 
-   await current.save();
+    current.drawnNumbers.push(number);
+    current.drawIndex=index+1;
+    current.countdown=
+     DRAW_TOTAL-current.drawIndex;
 
-   console.log(
-    "DRAW",
-    current.drawIndex+"/"+DRAW_TOTAL,
-    "NUMBER",
-    number
-   );
+    await current.save();
+
+    console.log(
+     "DRAW",
+     current.drawIndex+"/"+DRAW_TOTAL,
+     "NUMBER",
+     number
+    );
+   }
+
+   /*
+    * ONLY AFTER NUMBER 20:
+    * calculate WIN/LOSE,
+    * pay winners,
+    * complete the game.
+    */
 
    if(current.drawIndex>=DRAW_TOTAL){
 
@@ -435,7 +472,6 @@ async function gameLoop(){
 
    return;
   }
-
  }catch(e){
 
   console.error(
@@ -500,10 +536,28 @@ async function startup(){
   }
 
   if(g.phase==="DRAWING"){
+
     console.log(
       "▶️ DRAW RESUMED AT",
       g.drawIndex+"/"+DRAW_TOTAL
     );
+
+    if(g.drawIndex>=DRAW_TOTAL){
+
+      await settleTickets(g);
+
+      g.phase="COMPLETED";
+      g.countdown=0;
+      g.completedAt=new Date();
+
+      await g.save();
+
+      console.log(
+        "GAME",
+        g.game,
+        "COMPLETED AFTER RECOVERY"
+      );
+    }
   }
 }
 
