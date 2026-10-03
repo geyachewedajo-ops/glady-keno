@@ -1,4 +1,4 @@
-require("dotenv").config({path:__dirname+"/.env"});
+require("dotenv").config();
 
 const express=require("express");
 const cors=require("cors");
@@ -14,8 +14,7 @@ app.use(express.json());
 
 const BETTING_SECONDS=60;
 const DRAW_TOTAL=20;
-const DRAW_INTERVAL=2000;
-const FINAL_PAUSE=10000;
+const DRAW_INTERVAL=1000;
 const COMPLETE_WAIT=4000;
 const MAX_TICKETS=10000;
 
@@ -336,20 +335,6 @@ async function gameLoop(){
   }).sort({game:-1});
 
   if(!g){
-
-   const last=await Game.findOne({
-    phase:"COMPLETED"
-   }).sort({game:-1});
-
-   if(last&&last.completedAt){
-
-    const elapsed=
-     Date.now()-new Date(last.completedAt).getTime();
-
-    if(elapsed<FINAL_PAUSE)
-     return;
-   }
-
    await createGame();
    return;
   }
@@ -426,12 +411,6 @@ async function gameLoop(){
      "GAME",
      current.game,
      "COMPLETED"
-    );
-
-    console.log(
-     "⏳ NEXT GAME IN",
-     FINAL_PAUSE/1000,
-     "SECONDS"
     );
    }
 

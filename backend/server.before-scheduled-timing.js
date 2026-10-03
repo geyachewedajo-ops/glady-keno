@@ -1,4 +1,4 @@
-require("dotenv").config({path:__dirname+"/.env"});
+require("dotenv").config();
 
 const express=require("express");
 const cors=require("cors");
@@ -14,8 +14,7 @@ app.use(express.json());
 
 const BETTING_SECONDS=60;
 const DRAW_TOTAL=20;
-const DRAW_INTERVAL=2000;
-const FINAL_PAUSE=10000;
+const DRAW_INTERVAL=1000;
 const COMPLETE_WAIT=4000;
 const MAX_TICKETS=10000;
 
@@ -336,27 +335,14 @@ async function gameLoop(){
   }).sort({game:-1});
 
   if(!g){
-
-   const last=await Game.findOne({
-    phase:"COMPLETED"
-   }).sort({game:-1});
-
-   if(last&&last.completedAt){
-
-    const elapsed=
-     Date.now()-new Date(last.completedAt).getTime();
-
-    if(elapsed<FINAL_PAUSE)
-     return;
-   }
-
    await createGame();
    return;
   }
 
   if(g.phase==="BETTING"){
 
-   const remaining=await calculateCountdown(g);
+   const remaining=
+    await calculateCountdown(g);
 
    await Game.updateOne(
     {_id:g._id,phase:"BETTING"},
@@ -365,22 +351,26 @@ async function gameLoop(){
 
    if(remaining<=0){
 
-    await Game.updateOne(
-     {_id:g._id,phase:"BETTING"},
-     {$set:{
-      phase:"DRAWING",
-      drawingStartedAt:new Date(),
-      countdown:DRAW_TOTAL,
-      drawIndex:0,
-      drawnNumbers:[]
-     }}
-    );
+    const changed=
+     await Game.updateOne(
+      {_id:g._id,phase:"BETTING"},
+      {$set:{
+       phase:"DRAWING",
+       drawingStartedAt:new Date(),
+       countdown:DRAW_TOTAL,
+       drawIndex:0,
+       drawnNumbers:[]
+      }}
+     );
 
-    console.log(
-     "ROUND",g.round,
-     "GAME",g.game,
-     "DRAWING STARTED"
-    );
+    if(changed.modifiedCount){
+
+     console.log(
+      "ROUND",g.round,
+      "GAME",g.game,
+      "DRAWING STARTED"
+     );
+    }
    }
 
    return;
@@ -388,9 +378,11 @@ async function gameLoop(){
 
   if(g.phase==="DRAWING"){
 
-   const current=await Game.findById(g._id);
+   const current=
+    await Game.findById(g._id);
 
-   if(!current||current.phase!=="DRAWING")
+   if(!current||
+      current.phase!=="DRAWING")
     return;
 
    if(current.drawIndex>=DRAW_TOTAL)
@@ -401,7 +393,9 @@ async function gameLoop(){
 
    current.drawnNumbers.push(number);
    current.drawIndex=index+1;
-   current.countdown=DRAW_TOTAL-current.drawIndex;
+
+   current.countdown=
+    DRAW_TOTAL-current.drawIndex;
 
    await current.save();
 
@@ -423,15 +417,8 @@ async function gameLoop(){
     await current.save();
 
     console.log(
-     "GAME",
-     current.game,
+     "GAME",current.game,
      "COMPLETED"
-    );
-
-    console.log(
-     "⏳ NEXT GAME IN",
-     FINAL_PAUSE/1000,
-     "SECONDS"
     );
    }
 
@@ -640,27 +627,46 @@ app.post("/api/logout",login,async(q,r)=>{
 });
 
 app.get("/api/games",login,async(q,r)=>{
-  const balance=q.user.balance||0;
 
-  const list=await Game.find()
-    .sort({game:-1})
-    .limit(100);
+ const balance=q.user.balance||0;
 
-  r.json({
-    success:true,
-    round:list.length?list[0].round:1,
-    balance,
-    games:list.map(g=>({
-      game:g.game,
-      round:g.round,
-      phase:g.phase,
-      countdown:g.countdown,
-      drawnNumbers:g.drawnNumbers,
-      drawIndex:g.drawIndex,
-      drawTotal:DRAW_TOTAL,
-      ticketCount:0
-    }))
-  });
+ const list=await Game.find()
+  .sort({game:-1})
+  .limit(100);
+
+ r.json({
+  success:true,
+  round:list.length?list[0].round:1,
+  balance,
+
+  games:list.map(g=>({
+
+   game:g.game,
+   round:g.round,
+   phase:g.phase,
+
+   countdown:g.countdown,
+
+   bettingStartedAt:
+    g.bettingStartedAt,
+
+   drawingStartedAt:
+    g.drawingStartedAt,
+
+   drawnNumbers:
+    g.drawnNumbers,
+
+   drawIndex:
+    g.drawIndex,
+
+   drawTotal:
+    DRAW_TOTAL,
+
+   ticketCount:0
+
+  }))
+
+ });
 });
 
 app.post("/api/games/:id/play",login,async(q,r)=>{

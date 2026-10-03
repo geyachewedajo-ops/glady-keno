@@ -612,15 +612,6 @@ body{
 body{
  overflow-x:hidden;
 }
-
-.latestDraw{
- animation:latestNumber .7s ease-out;
-}
-@keyframes latestNumber{
- 0%{transform:scale(.65);opacity:.3}
- 60%{transform:scale(1.3);opacity:1}
- 100%{transform:scale(1);opacity:1}
-}
 </style>
 </head>
 
@@ -788,12 +779,6 @@ TIME: <b id="time">60</b>
 Choose numbers for the ticket.
 </p>
 
-<h3>🎱 DRAW</h3>
-<div id="draw" class="draw"></div>
-
-<h3>RESULT</h3>
-<div id="result"></div>
-
 </div>
 
 <div class="card">
@@ -830,6 +815,14 @@ Add at least one ticket.
 </div>
 
 <div class="card">
+
+<h3>DRAW</h3>
+
+<div id="draw" class="draw"></div>
+
+<h3>RESULT</h3>
+
+<div id="result"></div>
 
 <button id="history" class="white">
 🎫 MY HISTORY
@@ -1012,7 +1005,7 @@ $("loginBtn").onclick=async()=>{
 
 $("moneyBtn").onclick=()=>{
  $("money").classList.toggle("hidden");
- $("rules").classList.add("hidden");
+ $("gamesPanel").classList.toggle("hidden");
 };
 
 
@@ -1020,42 +1013,26 @@ function renderNumbers(){
 
  $("numbers").innerHTML="";
 
- const currentGame=games.find(
-  g=>g.game===selected
- );
-
- const drawn=currentGame?.drawnNumbers||[];
- const latest=drawn[drawn.length-1];
-
  for(let n=1;n<=80;n++){
 
   const b=document.createElement("button");
 
-  const isDrawn=drawn.includes(n);
-  const isSelected=currentNumbers.includes(n);
-  const isLatest=n===latest;
+  const currentGame=games.find(
+   g=>g.game===selected
+  );
+
+  const drawn=
+   currentGame &&
+   (currentGame.drawnNumbers||[]).includes(n);
 
   b.className=
    "num"+
-   (isSelected?" sel":"")+
-   (isDrawn?" drawn":"")+
-   (isLatest?" latestDraw":"");
+   (currentNumbers.includes(n)?" sel":"")+
+   (drawn?" drawn":"");
 
   b.textContent=n;
 
-  const betting=currentGame?.phase==="BETTING";
-
-  b.disabled=!betting || isDrawn;
-
   b.onclick=()=>{
-
-   if(!betting)return;
-
-   if(isDrawn){
-    $("numberMsg").textContent=
-     "This number has already been drawn.";
-    return;
-   }
 
    if(currentNumbers.includes(n)){
 
@@ -1084,7 +1061,6 @@ function renderNumbers(){
   $("numbers").appendChild(b);
  }
 }
-
 
 function renderTickets(){
 
@@ -1239,9 +1215,7 @@ async function loadSubmittedTickets(){
 
  try{
 
-  const d=await get(
-   "/api/tickets/history?_="+Date.now()
-  );
+  const d=await get("/api/tickets/history");
 
   submittedTickets=(d.tickets||[]).slice(0,50);
 
@@ -1251,14 +1225,7 @@ async function loadSubmittedTickets(){
    renderHistory(submittedTickets);
   }
 
-  return submittedTickets;
-
- }catch(e){
-
-  console.log("HISTORY ERROR:",e.message);
-  return [];
-
- }
+ }catch(e){}
 }
 
 window.removeTicket=i=>{
@@ -1319,71 +1286,44 @@ $("addTicket").onclick=()=>{
 
 };
 
-function renderGames(){
-
- const box=$("gameList");
-
- if(!box)return;
-
- if(!games.length){
-  box.innerHTML="<p>No games available.</p>";
-  return;
- }
-
- box.innerHTML=games.map(g=>`
-  <button
-   class="white"
-   onclick="chooseGame(${g.game})"
-   style="width:100%;margin:4px 0;"
-  >
-   GAME ${g.game}
-   • ROUND ${g.round}
-   • ${g.phase}
-  </button>
- `).join("");
-}
-
 async function loadGames(){
 
  try{
 
   const d=await get("/api/games");
 
-  games=Array.isArray(d.games)
-   ? d.games
-   : [];
+  games=d.games||[];
 
-  $("round").textContent=d.round ?? "";
-  $("balance").textContent=
-   (d.balance ?? 0)+" ETB";
+  $("round").textContent=d.round;
+  $("balance").textContent=d.balance + " ETB";
 
   const bettingGames=
    games.filter(g=>g.phase==="BETTING");
 
   if(bettingGames.length){
 
-   selected=bettingGames[0].game;
+   selected=
+    bettingGames[bettingGames.length-1].game;
 
   }else if(games.length){
 
-   selected=games[0].game;
+   selected=
+    games[games.length-1].game;
   }
 
   updateSelected();
-  renderGames();
+  loadSubmittedTickets();
 
  }catch(e){
 
-  $("playMsg").textContent=e.message;
+  $("gameMsg").textContent=e.message;
 
  }
-}
 
-clearInterval(timer);
-timer=setInterval(()=>{
- loadGames();
- loadSubmittedTickets();
-},1000);
+ clearInterval(timer);
+
+ timer=setInterval(loadGames,1000);
+}
 
 window.chooseGame=n=>{
 
@@ -1396,7 +1336,9 @@ window.chooseGame=n=>{
 
 function updateSelected(){
 
- const g=games.find(x=>x.game===selected);
+ const g=games.find(
+  x=>x.game===selected
+ );
 
  if(!g)return;
 
@@ -1404,15 +1346,12 @@ function updateSelected(){
  $("gameRound").textContent=g.round;
  $("gameNo").textContent=g.game;
  $("phase").textContent=g.phase;
- $("time").textContent=g.phase==="BETTING" ? g.countdown : "";
+ $("time").textContent=g.countdown;
 
- const drawn=Array.isArray(g.drawnNumbers)
-  ? g.drawnNumbers
-  : [];
-
- $("draw").innerHTML=drawn
-  .map(n=>`<div class="ball">${n}</div>`)
-  .join("");
+ $("draw").innerHTML=
+  (g.drawnNumbers||[])
+   .map(n=>`<div class="ball">${n}</div>`)
+   .join("");
 
  if(g.phase==="BETTING"){
 
@@ -1422,17 +1361,13 @@ function updateSelected(){
  }else if(g.phase==="DRAWING"){
 
   $("result").innerHTML=
-   "<span class='pending'>🎱 DRAWING... "+
-   drawn.length+"/"+(g.drawTotal || 20)+
-   "</span>";
+   "<span class='pending'>🎱 DRAWING...</span>";
 
  }else{
 
   $("result").innerHTML=
    "<span class='ok'>DRAW COMPLETED</span><br>"+
-   drawn.join(", ");
-
-  loadSubmittedTickets();
+   g.drawnNumbers.join(", ");
  }
 
  renderNumbers();
@@ -1645,7 +1580,7 @@ async function loadAdmin(){
     <br>
 
     ${g.phase} |
-    ${g.phase==="BETTING" ? g.countdown+"s" : ""}
+    ${g.countdown}s
 
     <br>
 
@@ -1831,7 +1766,7 @@ renderTickets();
 
 $("navAddTicket").onclick=()=>{
 $("money").classList.add("hidden");
-$("rules").classList.add("hidden");
+$("gamesPanel").classList.remove("hidden");
 
 const board=$("numbers");
 if(board){
