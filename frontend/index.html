@@ -1371,7 +1371,10 @@ async function loadGames(){
 }
 
 clearInterval(timer);
-timer=setInterval(loadGames,1000);
+timer=setInterval(()=>{
+ loadGames();
+ loadSubmittedTickets();
+},1000);
 
 window.chooseGame=n=>{
 
