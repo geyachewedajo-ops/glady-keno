@@ -52,6 +52,8 @@ const userSchema=new mongoose.Schema({
   passwordHash:String,
   role:{type:String,default:"customer"},
   balance:{type:Number,default:0},
+  referralCode:{type:String,unique:true,sparse:true,index:true},
+  referredBy:{type:String,index:true,default:null},
   createdAt:{type:Date,default:Date.now}
 });
 
@@ -114,6 +116,110 @@ const payoutSchema=new mongoose.Schema({
 
 const User=mongoose.model("User",userSchema);
 const Game=mongoose.model("Game",gameSchema);
+
+const commissionSchema=new mongoose.Schema({
+  username:{type:String,index:true},
+  sourceUsername:{type:String,index:true},
+  depositId:{type:String,index:true},
+  level:Number,
+  rate:Number,
+  amount:Number,
+  status:{type:String,default:"LEDGER"},
+  createdAt:{type:Date,default:Date.now}
+});
+
+commissionSchema.index(
+  {depositId:1,username:1,level:1},
+  {unique:true}
+);
+
+const Commission=mongoose.model("Commission",commissionSchema);
+
+function referralRate(level){
+  return 0.10/Math.pow(2,level-1);
+}
+
+function makeReferralCode(username){
+  return username.toUpperCase()+"-"+crypto.randomBytes(3).toString("hex").toUpperCase();
+}
+
+async function ensureReferralCode(user){
+  if(user.referralCode)return user.referralCode;
+
+  let code;
+  do{
+    code=makeReferralCode(user.username);
+  }while(await User.exists({referralCode:code}));
+
+  user.referralCode=code;
+  await user.save();
+  return code;
+}
+
+async function buildReferralChain(username){
+  const chain=[];
+  let current=await User.findOne({username});
+
+  for(let level=1;level<=50 && current && current.referredBy;level++){
+
+    const ref=String(current.referredBy).trim();
+
+    let parent=await User.findOne({
+      referralCode:ref
+    });
+
+    if(!parent && /^[a-f0-9]{24}$/i.test(ref)){
+      try{
+        parent=await User.findById(ref);
+      }catch(e){}
+    }
+
+    if(!parent)break;
+
+    await ensureReferralCode(parent);
+
+    chain.push({
+      level,
+      username:parent.username,
+      referralCode:parent.referralCode,
+      rate:referralRate(level)
+    });
+
+    current=parent;
+  }
+
+  return chain;
+}
+
+async function createReferralLedgerPreview(
+  depositId,
+  sourcePlayer,
+  amount
+){
+  const chain=await buildReferralChain(sourcePlayer);
+  const entries=[];
+
+  for(const parent of chain){
+    const commission=Number(
+      (amount*parent.rate).toFixed(2)
+    );
+
+    if(commission<=0)continue;
+
+    entries.push({
+      username:parent.username,
+      sourceUsername:sourcePlayer,
+      depositId,
+      level:parent.level,
+      rate:parent.rate,
+      amount:commission,
+      status:"LEDGER"
+    });
+  }
+
+  return entries;
+}
+
 const Ticket=mongoose.model("Ticket",ticketSchema);
 const Transaction=mongoose.model("Transaction",transactionSchema);
 const Session=mongoose.model("Session",sessionSchema);
@@ -580,6 +686,7 @@ app.post("/api/register",async(q,r)=>{
     const username=String(q.body.username||"").trim();
     const password=String(q.body.password||"");
     const confirm=String(q.body.confirmPassword||"");
+    const referralCode=String(q.body.referralCode||"").trim();
 
     if(!/^[a-zA-Z0-9_]{3,20}$/.test(username))
       return r.status(400).json({
@@ -599,6 +706,28 @@ app.post("/api/register",async(q,r)=>{
         message:"Passwords do not match."
       });
 
+    let referredBy=null;
+
+    if(referralCode){
+      const parent=await User.findOne({
+        referralCode:referralCode
+      });
+
+      if(!parent)
+        return r.status(400).json({
+          success:false,
+          message:"Invalid referral code."
+        });
+
+      if(parent.username===username)
+        return r.status(400).json({
+          success:false,
+          message:"You cannot refer yourself."
+        });
+
+      referredBy=parent.referralCode;
+    }
+
     const exists=await User.findOne({username});
 
     if(exists)
@@ -609,16 +738,20 @@ app.post("/api/register",async(q,r)=>{
 
     const passwordHash=await bcrypt.hash(password,12);
 
-    await User.create({
+    const user=await User.create({
       username,
       passwordHash,
       role:"customer",
-      balance:0
+      balance:0,
+      referredBy
     });
+
+    await ensureReferralCode(user);
 
     r.json({
       success:true,
-      message:"Registration successful."
+      message:"Registration successful.",
+      referralCode:user.referralCode
     });
 
   }catch(e){
@@ -678,6 +811,92 @@ app.post("/api/login",async(q,r)=>{
     r.status(500).json({
       success:false,
       message:"Login failed."
+    });
+  }
+});
+
+app.get("/api/referrals",async(q,r)=>{
+  try{
+    const user=await getUser(q);
+
+    if(!user)
+      return r.status(401).json({
+        message:"Login required."
+      });
+
+    await ensureReferralCode(user);
+
+    const direct=await User.find({
+      referredBy:user.referralCode
+    })
+    .select("username referralCode createdAt")
+    .sort({createdAt:-1});
+
+    const chain=await buildReferralChain(
+      user.username
+    );
+
+    const ledger=await Commission.find({
+      username:user.username
+    })
+    .sort({createdAt:-1})
+    .limit(200);
+
+    const total=ledger.reduce(
+      (sum,x)=>sum+x.amount,
+      0
+    );
+
+    r.json({
+      referralCode:user.referralCode,
+      directReferrals:direct,
+      chain,
+      totalLedger:Number(total.toFixed(2)),
+      ledger
+    });
+
+  }catch(e){
+    console.error(e);
+
+    r.status(500).json({
+      message:e.message
+    });
+  }
+});
+
+app.get("/api/referrals/chain",async(q,r)=>{
+  try{
+    const user=await getUser(q);
+
+    if(!user)
+      return r.status(401).json({
+        message:"Login required."
+      });
+
+    r.json(
+      await buildReferralChain(user.username)
+    );
+
+  }catch(e){
+    r.status(500).json({
+      message:e.message
+    });
+  }
+});
+
+app.get("/api/admin/referrals",async(q,r)=>{
+  try{
+    await admin(q);
+
+    r.json(
+      await Commission.find({})
+      .sort({createdAt:-1})
+      .limit(1000)
+    );
+
+  }catch(e){
+    r.status(403).json({
+      message:e.message
     });
   }
 });
@@ -1002,6 +1221,66 @@ app.post("/api/admin/transactions/:id/:action",admin,async(q,r)=>{
         if(t.type==="DEPOSIT"){
           u.balance+=t.amount;
           await u.save({session});
+
+          console.log(
+            "REFERRAL CHECK:",
+            t.username,
+            "DEPOSIT",
+            t.amount
+          );
+
+          const entries=await createReferralLedgerPreview(
+            t.transactionId||t.id,
+            t.username,
+            t.amount
+          );
+
+          console.log(
+            "REFERRAL ENTRIES:",
+            JSON.stringify(entries)
+          );
+
+          for(const entry of entries){
+
+            const existing=await Commission.findOne({
+              depositId:entry.depositId,
+              username:entry.username,
+              level:entry.level
+            }).session(session);
+
+            if(existing){
+              console.log(
+                "REFERRAL ALREADY PAID",
+                entry.depositId,
+                entry.username,
+                entry.amount
+              );
+              continue;
+            }
+
+            const referrer=await User.findOneAndUpdate(
+              {username:entry.username},
+              {$inc:{balance:entry.amount}},
+              {new:true,session}
+            );
+
+            if(!referrer)
+              throw new Error(
+                "Referral user not found: "+entry.username
+              );
+
+            await Commission.create([entry],{session});
+
+            console.log(
+              "REFERRAL COMMISSION",
+              entry.username,
+              "+",
+              entry.amount,
+              "ETB",
+              "LEVEL",
+              entry.level
+            );
+          }
         }
 
         t.status="APPROVED";
