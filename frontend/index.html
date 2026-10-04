@@ -647,6 +647,7 @@ body{
 <input id="regUser" placeholder="Username">
 <input id="regPass" type="password" placeholder="Password">
 <input id="regConfirm" type="password" placeholder="Confirm password">
+<input id="regRef" placeholder="Referral code (optional)">
 <button id="regBtn" class="primary">REGISTER</button>
 <p id="regMsg" class="msg"></p>
 <button id="backLogin" class="white">BACK TO LOGIN</button>
@@ -670,6 +671,7 @@ body{
 <button id="moneyBtn" class="primary">💰 MONEY</button>
 <button id="navAddTicket" class="primary">🎫 ADD TICKET</button>
 <button id="navHistory" class="white">📜 MY HISTORY</button>
+<button id="navReferrals" class="white">🤝 REFERRALS</button>
 <button id="navLogout" class="white">🚪 LOGOUT</button>
 <button id="navRules" class="white">🎯 GAME RULE</button>
 <a href="https://t.me/Flew123" target="_blank" rel="noopener"
@@ -678,6 +680,42 @@ padding:12px;border-radius:8px;text-decoration:none;font-weight:bold;">
 💬 TELEGRAM
 </a>
 </div>
+</div>
+
+<div id="referrals" class="hidden">
+
+<div class="card">
+<h2>🤝 REFERRAL PROGRAM</h2>
+
+<p>Your referral code:</p>
+
+<div class="info">
+<div>CODE<strong id="myReferralCode">-</strong></div>
+<div>LEDGER<strong id="refLedgerTotal">0 ETB</strong></div>
+</div>
+
+<button id="copyReferral" class="primary">
+COPY REFERRAL LINK
+</button>
+
+<p id="refLink" class="msg"></p>
+</div>
+
+<div class="card">
+<h3>👥 DIRECT REFERRALS</h3>
+<div id="directReferrals">Loading...</div>
+</div>
+
+<div class="card">
+<h3>🔗 REFERRAL CHAIN</h3>
+<div id="refChain">Loading...</div>
+</div>
+
+<div class="card">
+<h3>📒 COMMISSION LEDGER</h3>
+<div id="refLedger">Loading...</div>
+</div>
+
 </div>
 
 <div id="rules" class="hidden">
@@ -720,6 +758,23 @@ your prize is 500 ETB.
 <p style="color:#fbbf24;">
 ⚠️ Prize = Stake × Prize Multiplier
 </p>
+
+<h3>🤝 REFERRAL PROGRAM</h3>
+
+<p>Invite friends to Glady Keno using your referral link.</p>
+
+<p>When a referred player makes an approved deposit, the referral commission is recorded in your commission ledger.</p>
+
+<p><b>LEVEL 1:</b> 10%</p>
+<p><b>LEVEL 2:</b> 5%</p>
+<p><b>LEVEL 3:</b> 2.5%</p>
+<p><b>LEVEL 4:</b> 1.25%</p>
+
+<p>Higher levels continue at half the previous level's rate.</p>
+
+<p>Referral commissions are recorded separately in the commission ledger.</p>
+
+<p>Open <b>🤝 REFERRALS</b> to view your referral code, referral link, direct referrals and commission ledger.</p>
 
 <button id="closeRules" class="white">CLOSE RULES</button>
 
@@ -851,7 +906,10 @@ LOGOUT
 
 <div class="card">
 
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
 <h1>🛠️ Keno Admin</h1>
+<button id="adminLogout" class="red">🚪 LOGOUT</button>
+</div>
 
 <div class="info">
 <div>ROUND<strong id="ar">1</strong></div>
@@ -880,15 +938,11 @@ LOGOUT
 
 <br>
 
-<button id="reset" class="primary">
-RESET GAME
-</button>
+
 
 <br><br>
 
-<button id="adminLogout" class="red">
-LOGOUT
-</button>
+ 
 
 </div>
 </div>
@@ -957,6 +1011,14 @@ async function get(path){
  return d;
 }
 
+const urlReferralCode=
+ new URLSearchParams(location.search).get("ref")||"";
+
+if(urlReferralCode){
+ $("regRef").value=urlReferralCode;
+ $("regRef").readOnly=true;
+}
+
 $("regBtn").onclick=async()=>{
 
  try{
@@ -964,7 +1026,8 @@ $("regBtn").onclick=async()=>{
   const d=await post("/api/register",{
    username:$("regUser").value.trim(),
    password:$("regPass").value,
-   confirmPassword:$("regConfirm").value
+   confirmPassword:$("regConfirm").value,
+   referralCode:$("regRef").value.trim()
   });
 
   $("regMsg").textContent=d.message;
@@ -1757,20 +1820,6 @@ $("adminHist").onclick=async()=>{
  }
 };
 
-$("reset").onclick=async()=>{
-
- try{
-
-  await post("/api/game/reset",{});
-
-  loadAdmin();
-
- }catch(e){
-
-  alert(e.message);
-
- }
-};
 
 async function logout(){
 
@@ -1845,6 +1894,86 @@ try{
  h.textContent=e.message;
 
 }
+};
+
+$("navReferrals").onclick=async()=>{
+ $("money").classList.add("hidden");
+ $("hist").classList.add("hidden");
+ $("rules").classList.add("hidden");
+
+ const box=$("referrals");
+ if(!box)return;
+
+ box.classList.remove("hidden");
+
+ $("myReferralCode").textContent="Loading...";
+ $("refLedgerTotal").textContent="Loading...";
+ $("directReferrals").textContent="Loading...";
+ $("refChain").textContent="Loading...";
+ $("refLedger").textContent="Loading...";
+
+ try{
+  const d=await get("/api/referrals");
+
+  $("myReferralCode").textContent=d.referralCode||"-";
+
+  $("refLedgerTotal").textContent=
+   Number(d.totalLedger||0).toFixed(2)+" ETB";
+
+  const link=
+   location.origin+
+   location.pathname+
+   "?ref="+encodeURIComponent(d.referralCode||"");
+
+  $("refLink").textContent=link;
+
+  $("directReferrals").innerHTML=
+   (d.directReferrals||[]).length
+   ? d.directReferrals.map(x=>
+     "<p>👤 "+x.username+"</p>"
+   ).join("")
+   : "<p>No direct referrals yet.</p>";
+
+  $("refChain").innerHTML=
+   (d.chain||[]).length
+   ? d.chain.map(x=>
+     "<p>Level "+x.level+
+     " — "+x.username+
+     " — "+(x.rate*100).toFixed(3)+"%</p>"
+   ).join("")
+   : "<p>No referral chain.</p>";
+
+  $("refLedger").innerHTML=
+   (d.ledger||[]).length
+   ? d.ledger.map(x=>
+     "<p>Level "+x.level+
+     " — "+x.sourceUsername+
+     " — "+Number(x.amount).toFixed(2)+" ETB"+
+     " — LEDGER</p>"
+   ).join("")
+   : "<p>No ledger entries yet.</p>";
+
+ }catch(e){
+  $("refLedger").textContent=e.message;
+ }
+};
+
+$("copyReferral").onclick=async()=>{
+ const code=$("myReferralCode").textContent;
+
+ if(!code||code==="-"||code==="Loading...")return;
+
+ const link=
+  location.origin+
+  location.pathname+
+  "?ref="+encodeURIComponent(code);
+
+ try{
+  await navigator.clipboard.writeText(link);
+  $("refLink").textContent="Referral link copied!";
+ }catch(e){
+  $("refLink").textContent=link;
+ }
 };
 
 $("navLogout").onclick=async()=>{
